@@ -16,6 +16,9 @@ export interface Graph {
   selectedNode: NodeData | null;
   path: string;
   aboveSupportedLimit: boolean;
+  // optional editing state used by modals/components that need a global edit flag
+  editingNode: string | null;
+  editedContent: any;
 }
 
 const initialStates: Graph = {
@@ -28,6 +31,8 @@ const initialStates: Graph = {
   selectedNode: null,
   path: "",
   aboveSupportedLimit: false,
+  editingNode: null,
+  editedContent: null,
 };
 
 interface GraphActions {
@@ -43,13 +48,22 @@ interface GraphActions {
   centerView: () => void;
   clearGraph: () => void;
   setZoomFactor: (zoomFactor: number) => void;
+  startEditing: (nodeId: string, initialContent: any) => void;
+  cancelEditing: () => void;
 }
 
 const useGraph = create<Graph & GraphActions>((set, get) => ({
   ...initialStates,
   clearGraph: () => set({ nodes: [], edges: [], loading: false }),
   setSelectedNode: nodeData => set({ selectedNode: nodeData }),
+  startEditing: (nodeId: string, initialContent: any) => set({ editingNode: nodeId, editedContent: initialContent }),
+  cancelEditing: () => set({ editingNode: null, editedContent: null }),
   setGraph: (data, options) => {
+    // Clear previous graph state first to ensure components like Reaflow
+    // fully unmount old nodes/edges before we rebuild the new graph. This
+    // prevents duplicated/stacked nodes when the graph is rebuilt.
+    set({ nodes: [], edges: [], loading: true });
+
     const { nodes, edges } = parser(data ?? useJson.getState().json);
 
     if (nodes.length > SUPPORTED_LIMIT) {
@@ -64,6 +78,7 @@ const useGraph = create<Graph & GraphActions>((set, get) => ({
       nodes,
       edges,
       aboveSupportedLimit: false,
+      loading: false,
       ...options,
     });
   },

@@ -158,3 +158,23 @@ const useFile = create<FileStates & JsonActions>()((set, get) => ({
 }));
 
 export default useFile;
+
+// Keep the file editor contents in sync when the canonical JSON (useJson) changes.
+// We only run this in the browser to avoid server-side execution of editor logic.
+if (typeof window !== "undefined") {
+  useJson.subscribe(state => {
+    const json = state.json;
+    try {
+      const current = useFile.getState().contents;
+      if (current !== json) {
+        // Directly set state to avoid running setContents logic which may
+        // trigger debounced updates back into useJson.
+        useFile.setState({ contents: json, hasChanges: false });
+      }
+    } catch (e) {
+      // don't let sync failures crash the app
+      // eslint-disable-next-line no-console
+      console.warn("Failed to sync file contents from useJson:", e);
+    }
+  });
+}
